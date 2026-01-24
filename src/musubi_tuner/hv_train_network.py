@@ -124,7 +124,7 @@ def prepare_accelerator(args: argparse.Namespace) -> Accelerator:
         if log_with in ["tensorboard", "all"]:
             if logging_dir is None:
                 raise ValueError(
-                    "logging_dir is required when log_with is tensorboard / Tensorboardを使う場合、logging_dirを指定してください"
+                    "logging_dir is required when log_with is tensorboard / 当使用“log_with”参数设置为“tensorboard”时，必须指定“logging_dir”参数。"
                 )
         if log_with in ["wandb", "all"]:
             try:
@@ -278,7 +278,11 @@ def load_prompts(prompt_file: str) -> list[Dict]:
     elif prompt_file.endswith(".toml"):
         with open(prompt_file, "r", encoding="utf-8") as f:
             data = toml.load(f)
-        prompts = [dict(**data["prompt"], **subset) for subset in data["prompt"]["subset"]]
+        if "samples" in data:
+            prompts = data["samples"]
+            print(prompts)
+        else:
+            prompts = [dict(**data["prompt"], **subset) for subset in data["prompt"]["subset"]]
     elif prompt_file.endswith(".json"):
         with open(prompt_file, "r", encoding="utf-8") as f:
             prompts = json.load(f)
@@ -472,7 +476,7 @@ class NetworkTrainer:
             if optimizer_kwargs["relative_step"]:
                 logger.info("relative_step is true / relative_stepがtrueです")
                 if lr != 0.0:
-                    logger.warning("learning rate is used as initial_lr / 指定したlearning rateはinitial_lrとして使用されます")
+                    logger.warning("learning rate is used as initial_lr / 学习率被用作初始学习率（initial_lr）")
                 args.learning_rate = None
 
                 if args.lr_scheduler != "adafactor":
@@ -1644,28 +1648,28 @@ class NetworkTrainer:
             if args.cuda_allow_tf32:
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True
-                logger.info("Enabled TF32 on CUDA / CUDAでTF32を有効化しました")
+                logger.info("Enabled TF32 on CUDA / 开启TF32 ON CUDA")
             if args.cuda_cudnn_benchmark:
                 torch.backends.cudnn.benchmark = True
-                logger.info("Enabled cuDNN benchmark / cuDNNベンチマークを有効化しました")
+                logger.info("Enabled cuDNN benchmark / 启用cuDNN benchmark")
 
         # check required arguments
         if args.dataset_config is None:
-            raise ValueError("dataset_config is required / dataset_configが必要です")
+            raise ValueError("dataset_config is required / 没有dataset_config")
         if args.dit is None:
-            raise ValueError("path to DiT model is required / DiTモデルのパスが必要です")
-        assert not args.fp8_scaled or args.fp8_base, "fp8_scaled requires fp8_base / fp8_scaledはfp8_baseが必要です"
+            raise ValueError("path to DiT model is required / 没有DiT路径")
+        assert not args.fp8_scaled or args.fp8_base, "fp8_scaled requires fp8_base"
 
         if args.sage_attn:
             raise ValueError(
                 "SageAttention doesn't support training currently. Please use `--sdpa` or `--xformers` etc. instead."
-                " / SageAttentionは現在学習をサポートしていないようです。`--sdpa`や`--xformers`などの他のオプションを使ってください"
+                " / SageAttention 目前不支持训练。请改用 `--sdpa` 或 `--xformers` 等选项。"
             )
 
         if args.disable_numpy_memmap:
             logger.info(
                 "Disabling numpy memory mapping for model loading (for Wan, FramePack and Qwen-Image). This may lead to higher memory usage but can speed up loading in some cases."
-                " / モデル読み込み時のnumpyメモリマッピングを無効にします（Wan、FramePack、Qwen-Imageでのみ有効）。これによりメモリ使用量が増える可能性がありますが、場合によっては読み込みが高速化されることがあります"
+                " / 禁用用于模型加载的 numpy 内存映射（适用于 Wan、FramePack 和 Qwen-Image）。这可能会导致更高的内存使用量，但在某些情况下可以加快加载速度。"
             )
 
         # check model specific arguments
@@ -1702,7 +1706,7 @@ class NetworkTrainer:
         if train_dataset_group.num_train_items == 0:
             raise ValueError(
                 "No training items found in the dataset. Please ensure that the latent/Text Encoder cache has been created beforehand."
-                " / データセットに学習データがありません。latent/Text Encoderキャッシュを事前に作成したか確認してください"
+                " / 在数据集中未找到任何训练项目。请确保先已创建了latent/Text Encoder缓存。"
             )
 
         ds_for_collator = train_dataset_group if args.max_data_loader_n_workers == 0 else None
@@ -1880,7 +1884,7 @@ class NetworkTrainer:
                 len(train_dataloader) / accelerator.num_processes / args.gradient_accumulation_steps
             )
             accelerator.print(
-                f"override steps. steps for {args.max_train_epochs} epochs is / 指定エポックまでのステップ数: {args.max_train_steps}"
+                f"override steps. steps for {args.max_train_epochs} epochs is / 总训练步数: {args.max_train_steps}"
             )
 
         # send max_train_steps to train_dataset_group
@@ -1981,16 +1985,16 @@ class NetworkTrainer:
         # 学習する
         # total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
-        accelerator.print("running training / 学習開始")
-        accelerator.print(f"  num train items / 学習画像、動画数: {train_dataset_group.num_train_items}")
-        accelerator.print(f"  num batches per epoch / 1epochのバッチ数: {len(train_dataloader)}")
-        accelerator.print(f"  num epochs / epoch数: {num_train_epochs}")
+        accelerator.print("running training / 开始训练")
+        accelerator.print(f"  num train items / 训练图片数量: {train_dataset_group.num_train_items}")
+        accelerator.print(f"  num batches per epoch / 一轮训练的步数: {len(train_dataloader)}")
+        accelerator.print(f"  num epochs / 总轮数: {num_train_epochs}")
         accelerator.print(
-            f"  batch size per device / バッチサイズ: {', '.join([str(d.batch_size) for d in train_dataset_group.datasets])}"
+            f"  batch size per device / 批次大小: {', '.join([str(d.batch_size) for d in train_dataset_group.datasets])}"
         )
         # accelerator.print(f"  total train batch size (with parallel & distributed & accumulation) / 総バッチサイズ（並列学習、勾配合計含む）: {total_batch_size}")
-        accelerator.print(f"  gradient accumulation steps / 勾配を合計するステップ数 = {args.gradient_accumulation_steps}")
-        accelerator.print(f"  total optimization steps / 学習ステップ数: {args.max_train_steps}")
+        accelerator.print(f"  gradient accumulation steps / 梯度的总步数 = {args.gradient_accumulation_steps}")
+        accelerator.print(f"  total optimization steps / 训练步数: {args.max_train_steps}")
 
         # TODO refactor metadata creation and move to util
         metadata = {
@@ -2355,65 +2359,65 @@ def setup_parser_common() -> argparse.ArgumentParser:
         "--config_file",
         type=str,
         default=None,
-        help="using .toml instead of args to pass hyperparameter / ハイパーパラメータを引数ではなく.tomlファイルで渡す",
+        help="using .toml instead of args to pass hyperparameter / 在.toml文件中传递超参数，而不是参数",
     )
     parser.add_argument(
         "--dataset_config",
         type=pathlib.Path,
         default=None,
-        help="config file for dataset / データセットの設定ファイル",
+        help="config file for dataset / 数据集配置文件",
     )
 
     # model settings
     parser.add_argument(
         "--sdpa",
         action="store_true",
-        help="use sdpa for CrossAttention (requires PyTorch 2.0) / CrossAttentionにsdpaを使う（PyTorch 2.0が必要）",
+        help="use sdpa for CrossAttention (requires PyTorch 2.0) / 使用sdpa进行CrossAttention（需要PyTorch 2.0）",
     )
     parser.add_argument(
         "--flash_attn",
         action="store_true",
-        help="use FlashAttention for CrossAttention, requires FlashAttention / CrossAttentionにFlashAttentionを使う、FlashAttentionが必要",
+        help="use FlashAttention for CrossAttention, requires FlashAttention / CrossAttention使用FlashAttention，需要FlashAttention",
     )
     parser.add_argument(
         "--sage_attn",
         action="store_true",
-        help="use SageAttention. requires SageAttention / SageAttentionを使う。SageAttentionが必要",
+        help="use SageAttention. requires SageAttention / 使用SageAttention。需要SageAttention",
     )
     parser.add_argument(
         "--xformers",
         action="store_true",
-        help="use xformers for CrossAttention, requires xformers / CrossAttentionにxformersを使う、xformersが必要",
+        help="use xformers for CrossAttention, requires xformers / 使用xformers进行CrossAttention，需要xformers",
     )
     parser.add_argument(
         "--flash3",
         action="store_true",
         help="use FlashAttention 3 for CrossAttention, requires FlashAttention 3, HunyuanVideo does not support this yet"
-        " / CrossAttentionにFlashAttention 3を使う、FlashAttention 3が必要。HunyuanVideoは未対応。",
+        " / CrossAttention使用FlashAttention 3，需要FlashAttention 3。HunyuanVideo不支持。",
     )
     parser.add_argument(
         "--split_attn",
         action="store_true",
         help="use split attention for attention calculation (split batch size=1, affects memory usage and speed)"
-        " / attentionを分割して計算する（バッチサイズ=1に分割、メモリ使用量と速度に影響）",
+        " / 拆分并计算attention（拆分为批量大小=1，影响内存使用和速度）",
     )
     parser.add_argument(
         "--compile",
         action="store_true",
-        help="Enable torch.compile (requires Triton) / torch.compileを有効にする（Tritonが必要）",
+        help="Enable torch.compile (requires Triton) / 启用torch.compile（需要Triton）",
     )
     parser.add_argument(
         "--compile_backend",
         type=str,
         default="inductor",
-        help="torch.compile backend (default: inductor) / torch.compileのバックエンド（デフォルト: inductor）",
+        help="torch.compile backend (default: inductor) / torch.compile的后端（默认值：inductor）",
     )
     parser.add_argument(
         "--compile_mode",
         type=str,
         default="default",  # 学習用のデフォルト
         choices=["default", "reduce-overhead", "max-autotune", "max-autotune-no-cudagraphs"],
-        help="torch.compile mode (default: default) / torch.compileのモード（デフォルト: default）",
+        help="torch.compile mode (default: default) / torch.compile模式（默认：default）",
     )
     parser.add_argument(
         "--compile_dynamic",
@@ -2421,32 +2425,32 @@ def setup_parser_common() -> argparse.ArgumentParser:
         default=None,
         choices=["true", "false", "auto"],
         help="Dynamic shapes mode for torch.compile (default: None, same as auto)"
-        " / torch.compileの動的形状モード（デフォルト: None、autoと同じ動作）",
+        " / torch.compile的动态形状模式（默认：None，与auto相同）",
     )
     parser.add_argument(
         "--compile_fullgraph",
         action="store_true",
-        help="Enable fullgraph mode in torch.compile / torch.compileでフルグラフモードを有効にする",
+        help="Enable fullgraph mode in torch.compile / 在torch.compile上启用完整图形模式",
     )
     parser.add_argument(
         "--compile_cache_size_limit",
         type=int,
         default=None,
-        help="Set torch._dynamo.config.cache_size_limit (default: PyTorch default, typically 8-32) / torch._dynamo.config.cache_size_limitを設定（デフォルト: PyTorchのデフォルト、通常8-32）",
+        help="Set torch._dynamo.config.cache_size_limit (default: PyTorch default, typically 8-32) / 设置torch._dynamo.config.cache_size_limit（默认：PyTorch默认，通常为8-32）",
     )
     parser.add_argument(
         "--cuda_allow_tf32",
         action="store_true",
-        help="Allow TF32 on Ampere or higher GPUs / Ampere以降のGPUでTF32を許可する",
+        help="Allow TF32 on Ampere or higher GPUs / Ampere或更高版本的GPU允许TF32",
     )
     parser.add_argument(
         "--cuda_cudnn_benchmark",
         action="store_true",
-        help="Enable cudnn benchmark for possibly faster training / cudnnのベンチマークを有効にして学習の高速化を図る",
+        help="Enable cudnn benchmark for possibly faster training / 启用cudnn基准测试以加快学习速度",
     )
 
     # training settings
-    parser.add_argument("--max_train_steps", type=int, default=1600, help="training steps / 学習ステップ数")
+    parser.add_argument("--max_train_steps", type=int, default=1600, help="training steps / 训练步数")
     parser.add_argument(
         "--max_train_epochs",
         type=int,
