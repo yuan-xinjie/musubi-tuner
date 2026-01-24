@@ -1083,9 +1083,9 @@ class NetworkTrainer:
             return
 
         logger.info("")
-        logger.info(f"generating sample images at step / サンプル画像生成 ステップ: {steps}")
+        logger.info(f"generating sample images at step / 在: {steps}步采样")
         if sample_parameters is None:
-            logger.error(f"No prompt file / プロンプトファイルがありません: {args.sample_prompts}")
+            logger.error(f"No prompt file / 没有采样参数文件: {args.sample_prompts}")
             return
 
         distributed_state = PartialState()  # for multi gpu distributed inference. this is a singleton, so it's safe to use it here
@@ -3097,3 +3097,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
