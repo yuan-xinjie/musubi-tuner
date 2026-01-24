@@ -1,0 +1,38 @@
+# 全局设置
+[global_config]
+logging_dir = "./logs"
+flash_attn = true
+sdpa = false
+split_attn = true
+guidance_scale = 1
+network_args = true
+network_module = "networks.lora_qwen_image"
+lr_scheduler = "cosine_with_min_lr"
+lr_scheduler_num_cycles = 1
+lr_decay_steps = 0.2
+lr_scheduler_min_lr_ratio = 0.1
+cuda_allow_tf32 = true
+cuda_cudnn_benchmark = true
+mixed_precision = "bf16"
+fp8_base = true
+fp8_scaled = true
+persistent_data_loader_workers = true
+use_pinned_memory_for_block_swap = true
+compile = true
+compile_backend = "inductor"
+compile_mode = "max-autotune-no-cudagraphs"
+compile_dynamic = "auto"
+compile_cache_size_limit = 32
+img_in_txt_in_offloading = true
+optimizer_type = "adamw"
+gradient_checkpointing = true
+gradient_checkpointing_cpu_offload = false
+
+# 缓存设置
+[cache]
+vae_tiling = true
+vae_chunk_size = 32
+vae_spatial_tile_sample_min_size = 256
+fp8_vl = false
+batch_size = 16
+

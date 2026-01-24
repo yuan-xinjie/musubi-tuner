@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Musubi Tuner WebUI</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-icon">
+                    <i class="fas fa-microchip"></i>
+                </div>
+                <span>Musubi Tuner</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul class="nav-links">
+                    <li class="active" data-page="home">
+                        <i class="fas fa-home"></i>
+                        <span>概览</span>
+                    </li>
+                    <li data-page="config">
+                        <i class="fas fa-cog"></i>
+                        <span>配置</span>
+                    </li>
+                    <li data-page="advanced">
+                        <i class="fas fa-code"></i>
+                        <span>高级</span>
+                    </li>
+                    <li data-page="console" id="nav-console">
+                        <i class="fas fa-terminal"></i>
+                        <span>终端</span>
+                        <span class="running-dot" id="running-indicator"></span>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <p style="font-size: 0.7rem; color: var(--text-muted); text-align: center;">v1.0.0</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Home Section -->
+            <section id="page-home" class="page-section active">
+                <header class="page-header">
+                    <div class="header-left">
+                        <h1>任务概览</h1>
+                        <p class="header-subtitle">管理您的训练任务和配置</p>
+                    </div>
+                    <button id="btn-new-task" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> 新建任务
+                    </button>
+                </header>
+
+                <div class="home-main">
+                    <div id="log-panel" class="log-panel">
+                        <div class="log-header">
+                            <div class="log-title">
+                                <i class="fas fa-terminal"></i> 实时日志输出
+                            </div>
+                            <div class="log-actions">
+                                <button id="btn-stop-task" class="btn btn-danger btn-xs">
+                                    <i class="fas fa-stop"></i> 停止执行
+                                </button>
+                                <button id="btn-close-log" class="btn btn-ghost btn-xs">
+                                    <i class="fas fa-chevron-down"></i> 收起
+                                </button>
+                            </div>
+                        </div>
+                        <div id="log-content" class="log-content"></div>
+                    </div>
+
+                    <div class="task-grid" id="task-list">
+                        <!-- Tasks will be populated here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Config Section -->
+            <section id="page-config" class="page-section">
+                <header class="page-header">
+                    <div class="header-left">
+                        <h1 id="config-title">新建任务</h1>
+                        <p class="header-subtitle">配置您的训练参数</p>
+                    </div>
+                    <div class="header-actions">
+                        <div id="train-type-select-wrapper" style="min-width: 200px;">
+                            <!-- Custom Select Populated by JS -->
+                        </div>
+                        <button id="btn-save-config" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 保存配置
+                        </button>
+                    </div>
+                </header>
+
+                <form id="config-form" class="config-form-container">
+                    <div class="form-section">
+                        <h3><i class="fas fa-lock"></i> 训练参数</h3>
+                        <div class="params-grid" id="fixed-params-grid">
+                            <!-- Fields populated by JS -->
+                        </div>
+                    </div>
+
+                    <div id="general-dataset-group" class="horizontal-group">
+                        <!-- Merged General and Dataset populated by JS -->
+                    </div>
+
+                    <div id="page-config-samples" class="form-section">
+                        <h3>
+                            <span><i class="fas fa-vial"></i> 样本测试</span>
+                            <button type="button" id="btn-add-sample" class="btn btn-ghost btn-sm">
+                                <i class="fas fa-plus"></i> 添加样本
+                            </button>
+                        </h3>
+                        <div id="samples-list" class="samples-list">
+                            <!-- Samples cards populated by JS -->
+                        </div>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Advanced Section -->
+            <section id="page-advanced" class="page-section">
+                <header class="page-header">
+                    <div class="header-left">
+                        <h1 id="advanced-title">高级配置</h1>
+                        <p class="header-subtitle">编辑原始配置文件</p>
+                    </div>
+                    <button id="btn-save-raw-config" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 保存修改
+                    </button>
+                </header>
+                <div class="editor-container">
+                    <textarea id="raw-config-editor" spellcheck="false"></textarea>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="static/main.js"></script>
+</body>
+
+</html>
