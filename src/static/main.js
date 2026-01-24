@@ -859,7 +859,7 @@ function updateObjectFromForm(obj, prefix, formData) {
 function castType(key, val) {
     if (val === 'true') return true;
     if (val === 'false') return false;
-    if (['save_every_n_epochs', 'sample_every_n_epochs', 'max_train_epochs', 'batch_size', 'num_repeats', 'network_dim', 'network_alpha', 'blocks_to_swap', 'loraplus_lr_ratio', 'seed', 'discrete_flow_shift', 'sample_steps', 'width', 'height'].includes(key)) {
+    if (['save_every_n_epochs', 'sample_every_n_epochs', 'max_train_epochs', 'batch_size', 'num_repeats', 'network_dim', 'network_alpha', 'blocks_to_swap', 'loraplus_lr_ratio', 'seed', 'discrete_flow_shift', 'sample_steps', 'width', 'height', 'guidance_scale', 'frame_count'].includes(key)) {
         const n = parseFloat(val);
         return isNaN(n) ? val : n;
     }
