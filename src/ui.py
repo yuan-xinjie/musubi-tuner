@@ -37,7 +37,8 @@ class ProcessManager:
         """
         msg = json.dumps(data)
         to_remove = []
-        for ws in self.active_websockets:
+        # 使用 list() 创建副本进行迭代，防止多协程并发修改导致 RuntimeError
+        for ws in list(self.active_websockets):
             try:
                 # 检查连接状态 (1 为 OPEN)
                 if ws.client_state.value == 1:
