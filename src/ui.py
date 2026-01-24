@@ -437,7 +437,7 @@ async def save_task(data: SaveData):
         
         # 后端严格校验
         # 1. fixed_params 校验
-        fixed_int_keys = ['max_train_epochs', 'save_every_n_epochs', 'sample_every_n_epochs', 'network_dim', 'blocks_to_swap', 'network_alpha', 'loraplus_lr_ratio']
+        fixed_int_keys = ['max_train_epochs', 'save_every_n_epochs', 'sample_every_n_epochs', 'network_dim', 'blocks_to_swap', 'network_alpha', 'loraplus_lr_ratio', 'frame_count']
         fixed_float_keys = ['learning_rate']
         
         for k in fixed_int_keys:
