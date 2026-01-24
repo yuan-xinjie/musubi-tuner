@@ -176,6 +176,7 @@ class ConfigSanitizer:
             {
                 "general": self.general_schema,
                 "datasets": [self.dataset_schema],
+				voluptuous.Optional("samples"): list,
             }
         )
         self.argparse_schema = self.__merge_dict(
@@ -188,7 +189,7 @@ class ConfigSanitizer:
             return self.user_config_validator(user_config)
         except MultipleInvalid:
             # TODO: clarify the error message
-            logger.error("Invalid user config / ユーザ設定の形式が正しくないようです")
+            logger.error("Invalid user config / 无效的参数配置")
             raise
 
     # NOTE: In nature, argument parser result is not needed to be sanitize
@@ -199,7 +200,7 @@ class ConfigSanitizer:
         except MultipleInvalid:
             # XXX: this should be a bug
             logger.error(
-                "Invalid cmdline parsed arguments. This should be a bug. / コマンドラインのパース結果が正しくないようです。プログラムのバグの可能性が高いです。"
+                "Invalid cmdline parsed arguments. This should be a bug. / 命令行解析结果似乎不正确。可能是个BUG。"
             )
             raise
 
@@ -366,7 +367,7 @@ def generate_dataset_group_by_blueprint(
 def load_user_config(file: str) -> dict:
     file: Path = Path(file)
     if not file.is_file():
-        raise ValueError(f"file not found / ファイルが見つかりません: {file}")
+        raise ValueError(f"file not found / 没有找到文件: {file}")
 
     if file.name.lower().endswith(".json"):
         try:
@@ -374,7 +375,7 @@ def load_user_config(file: str) -> dict:
                 config = json.load(f)
         except Exception:
             logger.error(
-                f"Error on parsing JSON config file. Please check the format. / JSON 形式の設定ファイルの読み込みに失敗しました。文法が正しいか確認してください。: {file}"
+                f"Error on parsing JSON config file. Please check the format. / JSON文件内容格式错误，请检查内容格式: {file}"
             )
             raise
     elif file.name.lower().endswith(".toml"):
@@ -382,11 +383,11 @@ def load_user_config(file: str) -> dict:
             config = toml.load(file)
         except Exception:
             logger.error(
-                f"Error on parsing TOML config file. Please check the format. / TOML 形式の設定ファイルの読み込みに失敗しました。文法が正しいか確認してください。: {file}"
+                f"Error on parsing TOML config file. Please check the format. / TOML文件内容格式错误，请检查内容格式: {file}"
             )
             raise
     else:
-        raise ValueError(f"not supported config file format / 対応していない設定ファイルの形式です: {file}")
+        raise ValueError(f"not supported config file format / 不支持的文件格式: {file}")
 
     return config
 
