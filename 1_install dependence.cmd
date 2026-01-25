@@ -98,11 +98,52 @@ pip install typing
 pip install queue
 pip install -U "triton-windows<3.6"
 
+echo 安装flash_attn（已安装直接按Enter跳过）
+
+set "WHEEL_PATH1="
+set /p WHEEL_PATH1=请输入flash_attn轮子路径，已安装直接按Enter：
+if not defined WHEEL_PATH1 (
+    echo [提示] 跳过flash_attn安装
+) else (
+    :: 检测路径是否存在
+    if not exist "%WHEEL_PATH1%" (
+        echo [错误] 输入的路径不存在，请检查后重新执行！
+        pause
+        exit /b
+    )
+    :: 安装轮子包
+    pip install "%WHEEL_PATH1%"
+    if errorlevel 1 (
+        echo [警告] flash_attn安装失败，请检查版本与Python3.11兼容性
+    ) else (
+        echo [成功] flash_attn安装完成
+    )
+)
+
+echo 安装sageattention（已安装直接按Enter跳过）
+
+set "WHEEL_PATH2="
+set /p WHEEL_PATH2=请输入sageattention轮子路径，已安装直接按Enter：
+if not defined WHEEL_PATH2 (
+    echo [提示] 跳过sageattention安装
+) else (
+    :: 检测路径是否存在
+    if not exist "%WHEEL_PATH2%" (
+        echo [错误] 输入的路径不存在，请检查后重新执行！
+        pause
+        exit /b
+    )
+    :: 安装轮子包
+    pip install "%WHEEL_PATH2%"
+    if errorlevel 1 (
+        echo [警告] sageattention安装失败，请检查版本与Python3.11兼容性
+    ) else (
+        echo [成功] sageattention安装完成
+    )
+)
+
 echo 依赖安装完成
 echo ==============================================
-echo [完成] 流程执行完毕！
-echo 还需手动安装flash_attn、sageattention轮子，如已安装则可以启动项目
+echo [完成] 所有流程执行完毕！
 echo ==============================================
-
 pause
-
