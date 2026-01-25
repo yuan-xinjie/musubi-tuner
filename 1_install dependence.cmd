@@ -101,7 +101,8 @@ pip install -U "triton-windows<3.6"
 echo 依赖安装完成
 echo ==============================================
 echo [完成] 流程执行完毕！
-echo 还需手动安装flash_attn、sageattention轮子
+echo 还需手动安装flash_attn、sageattention轮子，如已安装则可以启动项目
 echo ==============================================
 
 pause
+
