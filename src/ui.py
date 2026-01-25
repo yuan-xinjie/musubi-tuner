@@ -247,6 +247,59 @@ async def save_raw_config(config: RawConfig):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class PickerRequest(BaseModel):
+    mode: str  # "file" or "folder"
+    title: str = "选择"
+    filetypes: List[str] = []  # e.g., [".safetensors", ".pt"]
+
+@app.post("/api/pick_path")
+async def pick_path(req: PickerRequest):
+    """
+    弹出系统文件/文件夹选择对话框
+    """
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    def run_dialog():
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        
+        if req.mode == "folder":
+            path = filedialog.askdirectory(title=req.title)
+        else:
+            # 构建文件类型过滤器
+            filetypes = []
+            if req.filetypes:
+                ext_str = " ".join(f"*{ext}" for ext in req.filetypes)
+                filetypes.append((f"支持的文件 ({ext_str})", ext_str))
+            filetypes.append(("所有文件", "*.*"))
+            path = filedialog.askopenfilename(title=req.title, filetypes=filetypes)
+        
+        root.destroy()
+        return path
+    
+    # 在主线程中运行 tkinter（避免线程问题）
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(run_dialog)
+        path = future.result()
+    
+    if path:
+        # 智能路径转换：如果是当前目录下的文件，转换为相对路径
+        try:
+            p = Path(path).resolve()
+            cwd = Path.cwd().resolve()
+            # 尝试获取相对路径
+            rel = p.relative_to(cwd)
+            # 强制使用正斜杠，并添加 ./ 前缀以明确是相对路径
+            path = f"./{rel.as_posix()}"
+        except ValueError:
+            # 不在当前目录下（或跨盘符），使用绝对路径，统一转为正斜杠
+            path = Path(path).as_posix()
+
+    return {"path": path or ""}
+
 @app.get("/.well-known/appspecific/com.chrome.devtools.json")
 async def devtools_handler():
     return JSONResponse(content={}, status_code=404)

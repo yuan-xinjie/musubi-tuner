@@ -77,6 +77,54 @@ const showToast = (msg) => {
     setTimeout(() => toast.classList.remove('show'), 5000);
 };
 
+// 需要文件/文件夹选择按钮的字段配置
+const PATH_PICKER_CONFIG = {
+    // 文件选择器（底模、VAE、文本编码器）
+    'dit': { mode: 'file', title: '选择底模文件', filetypes: ['.safetensors', '.pt', '.ckpt'] },
+    'vae': { mode: 'file', title: '选择VAE文件', filetypes: ['.safetensors', '.pt'] },
+    'text_encoder': { mode: 'file', title: '选择文本编码器', filetypes: ['.safetensors', '.pt'] },
+    // 文件夹选择器
+    'image_directory': { mode: 'folder', title: '选择目标图文件夹' },
+    'cache_directory': { mode: 'folder', title: '选择缓存文件夹' },
+    'control_directory': { mode: 'folder', title: '选择控制图文件夹' },
+    'control_image_path': { mode: 'file', title: '选择控制图', filetypes: ['.png', '.jpg', '.jpeg', '.webp', '.bmp'] }
+};
+
+// 弹出文件/文件夹选择对话框
+window.pickPath = async function (inputId, config) {
+    try {
+        const res = await fetch('/api/pick_path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+        const data = await res.json();
+        if (data.path) {
+            const input = document.getElementById(inputId) || document.querySelector(`input[name="${inputId}"]`);
+            if (input) input.value = data.path;
+        }
+    } catch (e) {
+        showToast('选择路径失败');
+    }
+}
+
+// 生成带选择按钮的路径输入框 HTML
+function renderPathInput(name, label, value, pickerKey) {
+    const config = PATH_PICKER_CONFIG[pickerKey];
+    const configJson = JSON.stringify(config).replace(/"/g, '&quot;');
+    return `
+        <div class="form-group flex-grow">
+            <label>${label}</label>
+            <div class="path-input-wrapper">
+                <input type="text" id="input_${name}" name="${name}" value="${value || ''}" class="path-input" spellcheck="false">
+                <button type="button" class="btn-pick" onclick="pickPath('input_${name}', JSON.parse('${configJson}'))" title="浏览...">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
 // 初始化
 async function init() {
     await fetchTemplates();
@@ -132,6 +180,14 @@ function initLogSocket() {
 
     logSocket = new WebSocket(wsUrl);
 
+    // 心跳保活
+    if (logSocket.heartbeat) clearInterval(logSocket.heartbeat);
+    logSocket.heartbeat = setInterval(() => {
+        if (logSocket.readyState === WebSocket.OPEN) {
+            logSocket.send('ping');
+        }
+    }, 30000);
+
     logSocket.onmessage = (event) => {
         try {
             const msg = JSON.parse(event.data);
@@ -164,11 +220,21 @@ function initLogSocket() {
     };
 
     logSocket.onclose = (e) => {
+        if (logSocket.heartbeat) clearInterval(logSocket.heartbeat);
         if (!e.wasClean) {
             setTimeout(initLogSocket, 3000);
         }
     };
 }
+
+// 基础连接检查
+setInterval(() => {
+    // 仅在完全断开 (CLOSED) 或未初始化时重连
+    // 避免干扰 CONNECTING (0) 或 OPEN (1) 状态
+    if (!logSocket || logSocket.readyState === WebSocket.CLOSED) {
+        initLogSocket();
+    }
+}, 5000);
 
 function updateRunningState(isRunning) {
     state.backendRunning = isRunning;
@@ -609,6 +675,11 @@ function renderFormFields(type, fixedData = {}, templateData = null) {
             }
             if (typeof value === 'boolean') return renderToggleField(`fixed_${key}`, getLabel(key), value);
 
+            // 检查是否需要路径选择器
+            if (PATH_PICKER_CONFIG[key]) {
+                return renderPathInput(`fixed_${key}`, getLabel(key), value, key);
+            }
+
             const isInt = ['max_train_epochs', 'save_every_n_epochs', 'sample_every_n_epochs', 'network_dim', 'blocks_to_swap', 'loraplus_lr_ratio'].includes(key);
             let onInputAttr = isInt ? `oninput="this.value=this.value.replace(/[^0-9]/g,'')"` : '';
             if (key === 'output_name') onInputAttr += ` onkeyup="updateOutputDir(this.value)"`;
@@ -692,6 +763,12 @@ function renderDatasetRow(container, general, dataset, type) {
         const isPath = key.includes('directory') || key.includes('path') || key === 'prompt';
 
         if (typeof val === 'boolean') return `<div class="form-group row-group"><label>${getLabel(key)}</label><label class="switch"><input type="checkbox" name="${fullKey}" ${val ? 'checked' : ''} value="true"><span class="slider"></span></label></div>`;
+
+        // 检查是否需要路径选择器（目录字段）
+        if (PATH_PICKER_CONFIG[key]) {
+            return renderPathInput(fullKey, getLabel(key), val, key);
+        }
+
         return `<div class="form-group ${isPath ? 'flex-grow' : (isNumeric ? 'input-mini-container' : '')}"><label>${getLabel(key)}</label><input type="text" name="${fullKey}" value="${val}" class="${isNumeric ? 'input-mini' : ''}"></div>`;
     }).join('');
 }
@@ -727,7 +804,9 @@ function renderSamplesList(samples) {
         const fullKey = `tmpl_samples_${idx}_${key}`;
         if (key === 'control_image_path') {
             const ps = Array.isArray(val) ? val : [val];
-            return `<div class="form-group flex-grow"><label>P1</label><input type="text" name="${fullKey}_0" value="${ps[0] || ''}"></div><div class="form-group flex-grow"><label>P2</label><input type="text" name="${fullKey}_1" value="${ps[1] || ''}"></div><div class="form-group flex-grow"><label>P3</label><input type="text" name="${fullKey}_2" value="${ps[2] || ''}"></div>`;
+            return renderPathInput(`${fullKey}_0`, 'P1', ps[0] || '', 'control_image_path') +
+                renderPathInput(`${fullKey}_1`, 'P2', ps[1] || '', 'control_image_path') +
+                renderPathInput(`${fullKey}_2`, 'P3', ps[2] || '', 'control_image_path');
         }
         if (typeof val === 'boolean') return `<div class="form-group row-group"><label>${getLabel(key)}</label><label class="switch"><input type="checkbox" name="${fullKey}" ${val ? 'checked' : ''} value="true"><span class="slider"></span></label></div>`;
 
