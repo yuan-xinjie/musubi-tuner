@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel
 import tomlkit
+import webbrowser
 
 app = FastAPI()
 
@@ -785,6 +786,12 @@ async def get_thumbnail(path: str):
 
     raise HTTPException(status_code=404, detail="No images found")
 
+@app.on_event("startup")
+async def startup_event():
+    target_url = "http://127.0.0.1:9980"
+    await asyncio.sleep(0.5)
+    webbrowser.open(target_url)
+
 # 静态文件服务
 @app.get("/")
 async def read_index():
@@ -794,4 +801,4 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=9980)
