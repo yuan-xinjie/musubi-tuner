@@ -91,7 +91,11 @@ pip install -e .
 
 echo 正在安装其他依赖...
 pip install ascii-magic matplotlib tensorboard prompt-toolkit
-pip install tomlkit fastapi pydantic typing queue
+pip install fastapi "uvicorn[standard]"
+pip install tomlkit
+pip install pydantic
+pip install typing
+pip install queue
 pip install -U "triton-windows<3.6"
 
 echo 依赖安装完成
