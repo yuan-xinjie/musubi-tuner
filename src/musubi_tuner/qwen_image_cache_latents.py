@@ -155,7 +155,7 @@ def main():
 
     # Load dataset config
     blueprint_generator = BlueprintGenerator(ConfigSanitizer())
-    logger.info(f"Load dataset config from {args.dataset_config}")
+    logger.info(f"Load dataset config from {args.dataset_config} | 加载数据集文件：{args.dataset_config}")
     user_config = config_utils.load_user_config(args.dataset_config)
     if args.is_edit:
         architecture = ARCHITECTURE_QWEN_IMAGE_EDIT
@@ -177,7 +177,7 @@ def main():
 
     assert args.vae is not None, "VAE checkpoint is required"
 
-    logger.info(f"Loading VAE model from {args.vae}")
+    logger.info(f"Loading VAE model from {args.vae} | 加载VAE模型：{args.vae}")
     input_channels = 4 if args.is_layered else 3
     vae = qwen_image_utils.load_vae(args.vae, input_channels, device=device, disable_mmap=True)
     vae.to(device)

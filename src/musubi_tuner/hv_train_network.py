@@ -1696,7 +1696,7 @@ class NetworkTrainer:
         current_epoch = Value("i", 0)  # shared between processes
 
         blueprint_generator = BlueprintGenerator(ConfigSanitizer())
-        logger.info(f"Load dataset config from {args.dataset_config}")
+        logger.info(f"加载数据集配置文件：{args.dataset_config}")
         user_config = config_utils.load_user_config(args.dataset_config)
         blueprint = blueprint_generator.generate(user_config, args, architecture=self.architecture)
         train_dataset_group = config_utils.generate_dataset_group_by_blueprint(
@@ -3097,4 +3097,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

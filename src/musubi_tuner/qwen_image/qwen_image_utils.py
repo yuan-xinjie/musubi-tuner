@@ -723,7 +723,7 @@ def convert_comfyui_state_dict(sd):
             new_key = key.replace(key_without_suffix, key_map[key_without_suffix])
         new_state_dict[new_key] = sd[key]
 
-    logger.info("Converted ComfyUI AutoencoderKL state dict keys to official format")
+    logger.info("Converted ComfyUI AutoencoderKL state dict keys to official format | 将ComfyUI编码状态转换为官方格式")
     return new_state_dict
 
 
@@ -789,7 +789,7 @@ def load_vae(
   "z_dim": 16
 }
 """
-    logger.info("Initializing VAE")
+    logger.info("Initializing VAE | 加载VAE模型")
     config = json.loads(VAE_CONFIG_JSON)
     vae = AutoencoderKLQwenImage(
         base_dim=config["base_dim"],
@@ -804,7 +804,7 @@ def load_vae(
         input_channels=input_channels,
     )
 
-    logger.info(f"Loading VAE from {vae_path}")
+    logger.info(f"Loading VAE from {vae_path} | 加载VAE模型路径：{vae_path}")
     state_dict = load_safetensors(vae_path, device=device, disable_mmap=disable_mmap)
 
     # Convert ComfyUI VAE keys to official VAE keys

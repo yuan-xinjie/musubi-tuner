@@ -136,20 +136,20 @@ def main():
     all_cache_files_for_dataset, all_cache_paths_for_dataset = cache_text_encoder_outputs.prepare_cache_files_and_paths(datasets)
 
     # Load Qwen2.5-VL
-    logger.info(f"Loading Qwen2.5-VL: {args.text_encoder}")
+    logger.info(f"加载Qwen2.5-VL文本编码器: {args.text_encoder}")
     tokenizer, text_encoder = qwen_image_utils.load_qwen2_5_vl(
         ckpt_path=args.text_encoder, dtype=vl_dtype, device=device, disable_mmap=True
     )
 
     # Load Qwen2VLProcessor
     if args.is_edit:
-        logger.info("Loading Qwen2.5-VL Processor for Edit")
+        logger.info("加载Qwen2.5-VL处理为编辑模式")
         vl_processor = qwen_image_utils.load_vl_processor()
     else:
         vl_processor = None
 
     # Encode with Qwen2.5-VL
-    logger.info("Encoding with Qwen2.5-VL")
+    logger.info("使用Qwen2.5-VL编码")
 
     def encode_for_text_encoder(batch: list[ItemInfo]):
         nonlocal tokenizer, text_encoder, vl_processor, device, accelerator, args

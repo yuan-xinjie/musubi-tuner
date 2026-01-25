@@ -1008,9 +1008,9 @@ class ImageDirectoryDatasource(ImageDatasource):
         self.current_idx = 0
 
         # glob images
-        logger.info(f"glob images in {self.image_directory}")
+        logger.info(f"glob images in {self.image_directory} | 图片路径：{self.image_directory}")
         self.image_paths = glob_images(self.image_directory, caption_extension=self.caption_extension)
-        logger.info(f"found {len(self.image_paths)} images")
+        logger.info(f"found {len(self.image_paths)} images | 共{len(self.image_paths)}张图片")
 
         # check if multiple-target images exist
         self.target_paths: dict[str, list[str]] = {}  # image_path -> list of target image paths
@@ -1069,7 +1069,7 @@ class ImageDirectoryDatasource(ImageDatasource):
 
         # glob control images if specified
         if self.control_directory is not None:
-            logger.info(f"glob control images in {self.control_directory}")
+            logger.info(f"glob control images in {self.control_directory} | 控制图路径：{self.control_directory}")
             self.has_control = True
             self.control_paths = {}
 
@@ -1131,7 +1131,7 @@ class ImageDirectoryDatasource(ImageDatasource):
                     count_of_num_control_images[count] = 0
                 count_of_num_control_images[count] += 1
             for count, num_images in count_of_num_control_images.items():
-                logger.info(f"  {num_images} images have {count} control images")
+                logger.info(f"  {num_images} images have {count} control images | {num_images}张目标图对应{count}张控制图")
 
             missing_controls = len(self.image_paths) - len(self.control_paths)
             if missing_controls > 0:
