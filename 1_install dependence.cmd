@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 :: 定义核心变量
 set VENV_DIR=.venv
-set PYTHON_REQUIRED=3.11+
+set PYTHON_REQUIRED=3.12+
 
 echo ==============================================
 echo 检测虚拟环境
@@ -62,10 +62,10 @@ echo ==============================================
 echo UV创建虚拟环境
 echo ==============================================
 :: 用UV创建虚拟环境
-uv venv -p 3.11 --seed "%VENV_DIR%"
+uv venv -p 3.12 --seed "%VENV_DIR%"
 if errorlevel 1 (
     echo [错误] UV创建虚拟环境失败！
-    echo     可能原因：Python版本低于3.11 / UV安装异常
+    echo     可能原因：Python版本低于3.13 / UV安装异常
     pause
     exit /b
 )
@@ -83,9 +83,6 @@ if errorlevel 1 (
     exit /b
 )
 
-echo 正在安装 PyTorch...
-pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu130
-
 echo 正在安装当前项目(Editable模式)...
 pip install -e .
 
@@ -95,53 +92,15 @@ pip install fastapi "uvicorn[standard]"
 pip install tomlkit
 pip install pydantic
 pip install typing
-pip install queue
 pip install -U "triton-windows<3.6"
 
-echo 安装flash_attn（已安装直接按Enter跳过）
+echo 正在安装 PyTorch...
+pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu130
 
-set "WHEEL_PATH1="
-set /p WHEEL_PATH1=请输入flash_attn轮子路径，已安装直接按Enter：
-if not defined WHEEL_PATH1 (
-    echo [提示] 跳过flash_attn安装
-) else (
-    :: 检测路径是否存在
-    if not exist "%WHEEL_PATH1%" (
-        echo [错误] 输入的路径不存在，请检查后重新执行！
-        pause
-        exit /b
-    )
-    :: 安装轮子包
-    pip install "%WHEEL_PATH1%"
-    if errorlevel 1 (
-        echo [警告] flash_attn安装失败，请检查版本与Python3.11兼容性
-    ) else (
-        echo [成功] flash_attn安装完成
-    )
-)
-
-echo 安装sageattention（已安装直接按Enter跳过）
-
-set "WHEEL_PATH2="
-set /p WHEEL_PATH2=请输入sageattention轮子路径，已安装直接按Enter：
-if not defined WHEEL_PATH2 (
-    echo [提示] 跳过sageattention安装
-) else (
-    :: 检测路径是否存在
-    if not exist "%WHEEL_PATH2%" (
-        echo [错误] 输入的路径不存在，请检查后重新执行！
-        pause
-        exit /b
-    )
-    :: 安装轮子包
-    pip install "%WHEEL_PATH2%"
-    if errorlevel 1 (
-        echo [警告] sageattention安装失败，请检查版本与Python3.11兼容性
-    ) else (
-        echo [成功] sageattention安装完成
-    )
-)
-
+echo 安装flash_attn
+pip install "https://huggingface.co/Wildminder/AI-windows-whl/resolve/main/flash_attn-2.8.3+cu130torch2.9.1cxx11abiTRUE-cp312-cp312-win_amd64.whl"
+echo 安装sageattention
+pip install "https://github.com/woct0rdho/SageAttention/releases/download/v2.2.0-windows.post4/sageattention-2.2.0+cu130torch2.9.0andhigher.post4-cp39-abi3-win_amd64.whl"
 echo 依赖安装完成
 echo ==============================================
 echo [完成] 所有流程执行完毕！
