@@ -130,7 +130,7 @@ def prepare_accelerator(args: argparse.Namespace) -> Accelerator:
             try:
                 import wandb
             except ImportError:
-                raise ImportError("No wandb / wandb がインストールされていないようです")
+                raise ImportError("No wandb / 没有安装wandb模块")
             if logging_dir is not None:
                 os.makedirs(logging_dir, exist_ok=True)
                 os.environ["WANDB_DIR"] = logging_dir
@@ -282,7 +282,7 @@ def load_prompts(prompt_file: str) -> list[Dict]:
             prompts = data["samples"]
             print(prompts)
         else:
-        prompts = [dict(**data["prompt"], **subset) for subset in data["prompt"]["subset"]]
+            prompts = [dict(**data["prompt"], **subset) for subset in data["prompt"]["subset"]]
     elif prompt_file.endswith(".json"):
         with open(prompt_file, "r", encoding="utf-8") as f:
             prompts = json.load(f)

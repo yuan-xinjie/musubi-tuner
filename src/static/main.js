@@ -11,7 +11,7 @@ const state = {
 };
 
 // 默认值映射
-const DEFAULTS = {
+const DEFAULTS_QWEN = {
     'learning_rate': '1e-4',
     'max_train_epochs': 40,
     'save_every_n_epochs': 2,
@@ -22,6 +22,20 @@ const DEFAULTS = {
     'network_alpha': 16,
     'blocks_to_swap': 20,
     'network_weights': ''
+};
+
+const DEFAULTS_WAN = {
+    'learning_rate': '1e-4',
+    'max_train_epochs': 10,
+    'save_every_n_epochs': 2,
+    'timestep_sampling': 'shift',
+    'loraplus_lr_ratio': 4,
+    'network_dim': 32,
+    'network_alpha': 16,
+    'blocks_to_swap': 16,
+    'network_weights': '',
+    'max_data_loader_n_workers': 8,
+    'task': 't2v-A14B'
 };
 
 // 内部隐藏键，不渲染为常规表单项
@@ -44,7 +58,7 @@ const LABEL_MAP = {
     'vae': 'VAE路径',
     'text_encoder': '文本编码器路径',
     'network_weights': '从已有的权重继续训练',
-    'resolution': '目标图分辨率',
+    'resolution': '分辨率',
     'dataset_config': '数据集配置',
     'batch_size': '批次大小',
     'num_repeats': '重复次数',
@@ -63,7 +77,18 @@ const LABEL_MAP = {
     'frame_count': '帧数',
     'P1': '控制图1',
     'P2': '控制图2',
-    'P3': '控制图3'
+    'P3': '控制图3',
+    'video_directory': '视频路径',
+    'max_frames': '最大帧数',
+    'target_frames': '目标帧数',
+    'frame_sample': '帧采样',
+    'frame_extraction': '帧提取方式',
+    'task': '任务类型(task)',
+    'clip': 'CLIP路径',
+    't5': 'T5路径',
+    'min_timestep': '最小时间步',
+    'max_timestep': '最大时间步',
+    'max_data_loader_n_workers': '数据加载线程数'
 };
 
 const getLabel = (key) => LABEL_MAP[key] || key;
@@ -83,8 +108,11 @@ const PATH_PICKER_CONFIG = {
     'dit': { mode: 'file', title: '选择底模文件', filetypes: ['.safetensors', '.pt', '.ckpt'] },
     'vae': { mode: 'file', title: '选择VAE文件', filetypes: ['.safetensors', '.pt'] },
     'text_encoder': { mode: 'file', title: '选择文本编码器', filetypes: ['.safetensors', '.pt'] },
+    't5': { mode: 'file', title: '选择T5文件', filetypes: ['.safetensors', '.pt', '.pth'] },
+    'clip': { mode: 'file', title: '选择CLIP文件', filetypes: ['.safetensors', '.pt'] },
     // 文件夹选择器
     'image_directory': { mode: 'folder', title: '选择目标图文件夹' },
+    'video_directory': { mode: 'folder', title: '选择视频文件夹' },
     'cache_directory': { mode: 'folder', title: '选择缓存文件夹' },
     'control_directory': { mode: 'folder', title: '选择控制图文件夹' },
     'control_image_path': { mode: 'file', title: '选择控制图', filetypes: ['.png', '.jpg', '.jpeg', '.webp', '.bmp'] }
@@ -101,22 +129,39 @@ window.pickPath = async function (inputId, config) {
         const data = await res.json();
         if (data.path) {
             const input = document.getElementById(inputId) || document.querySelector(`input[name="${inputId}"]`);
-            if (input) input.value = data.path;
+            if (input) {
+                input.value = data.path;
+                input.dispatchEvent(new Event('input'));
+                input.dispatchEvent(new Event('change'));
+            }
         }
     } catch (e) {
         showToast('选择路径失败');
     }
 }
 
+window.updateCacheDir = (val) => {
+    const cacheInput = document.getElementById('input_tmpl_datasets_0_cache_directory') || document.querySelector(`input[name="tmpl_datasets_0_cache_directory"]`);
+    if (cacheInput && val) {
+        const sep = val.includes('\\') ? '\\' : '/';
+        const stripped = val.endsWith(sep) ? val.slice(0, -1) : val;
+        cacheInput.value = stripped + sep + 'cache';
+    }
+};
+
 // 生成带选择按钮的路径输入框 HTML
 function renderPathInput(name, label, value, pickerKey) {
     const config = PATH_PICKER_CONFIG[pickerKey];
     const configJson = JSON.stringify(config).replace(/"/g, '&quot;');
+    let extraAttr = '';
+    if (name === 'tmpl_datasets_0_video_directory' || name === 'tmpl_datasets_0_image_directory') {
+        extraAttr = `oninput="updateCacheDir(this.value)" onchange="updateCacheDir(this.value)"`;
+    }
     return `
         <div class="form-group flex-grow">
             <label>${label}</label>
             <div class="path-input-wrapper">
-                <input type="text" id="input_${name}" name="${name}" value="${value || ''}" class="path-input" spellcheck="false">
+                <input type="text" id="input_${name}" name="${name}" value="${value || ''}" class="path-input" spellcheck="false" ${extraAttr}>
                 <button type="button" class="btn-pick" onclick="pickPath('input_${name}', JSON.parse('${configJson}'))" title="浏览...">
                     <i class="fas fa-folder-open"></i>
                 </button>
@@ -346,6 +391,58 @@ window.toggleDropdown = (name) => {
     if (!isActive) el.classList.add('active');
 };
 
+window.toggleNoiseSwitch = (target) => {
+    const low = document.getElementById('switch_noise_low');
+    const high = document.getElementById('switch_noise_high');
+    if (!low || !high) return;
+
+    if (target === 'low') {
+        if (!low.checked) low.checked = true; // prevent unchecking both
+        high.checked = false;
+    } else {
+        if (!high.checked) high.checked = true;
+        low.checked = false;
+    }
+    applyNoisePresets();
+};
+
+window.applyNoisePresets = () => {
+    const taskInput = document.getElementById('input_fixed_task');
+    const highInput = document.getElementById('switch_noise_high');
+    const shiftInput = document.getElementById('input_fixed_discrete_flow_shift');
+    const minInput = document.getElementById('input_fixed_min_timestep');
+    const maxInput = document.getElementById('input_fixed_max_timestep');
+
+    if (!taskInput || !highInput || !shiftInput || !minInput || !maxInput) return;
+
+    const task = taskInput.value || '';
+    const isHighNoise = highInput.checked;
+
+    if (task.includes('i2v')) {
+        shiftInput.value = 5;
+        if (isHighNoise) {
+            minInput.value = 900;
+            maxInput.value = 1000;
+        } else {
+            minInput.value = 0;
+            maxInput.value = 900;
+        }
+    } else if (task.includes('t2v')) {
+        shiftInput.value = 12;
+        if (isHighNoise) {
+            minInput.value = 875;
+            maxInput.value = 1000;
+        } else {
+            minInput.value = 0;
+            maxInput.value = 875;
+        }
+    }
+    // Only show toast if user actively clicked the switch or selected dropdown
+    if (window.event && window.event.type !== 'DOMContentLoaded') {
+        if (typeof showToast === 'function') showToast(`已应用 ${task} ${isHighNoise ? '高噪' : '低噪'} 默认参数`);
+    }
+};
+
 window.selectDropdownOption = (name, value, label) => {
     const container = $(`container_${name}`);
     const input = $(`input_${name}`);
@@ -363,7 +460,29 @@ window.selectDropdownOption = (name, value, label) => {
 
     if (name === 'train_type') {
         const currentData = getCurrentFormData();
+        const isWan = value === 'Wan2.2';
+        const activeDefaults = isWan ? DEFAULTS_WAN : DEFAULTS_QWEN;
+        const oldDefaults = isWan ? DEFAULTS_QWEN : DEFAULTS_WAN;
+
+        for (let k in activeDefaults) {
+            // If the field matches the old default, or if it was entirely empty/unused by the previous form block
+            if (currentData.fixed[k] === oldDefaults[k] || currentData.fixed[k] === '' || currentData.fixed[k] === undefined) {
+                currentData.fixed[k] = activeDefaults[k];
+            }
+        }
+        
+        const oldType = $('input_train_type').dataset.oldType;
+        if (oldType && oldType !== value) {
+            currentData.template = JSON.parse(JSON.stringify(state.templates[value] || state.templates['Qwen-Image']));
+            $('input_train_type').dataset.oldType = value;
+        }
+
         renderFormFields(value, currentData.fixed, currentData.template);
+        if (isWan) {
+            setTimeout(() => { applyNoisePresets(); }, 50);
+        }
+    } else if (name === 'fixed_task') {
+        applyNoisePresets();
     }
 };
 
@@ -384,10 +503,11 @@ function getCurrentFormData() {
     if (rawTemplate) {
         const ALL_KEYS = [
             'output_name', 'output_dir', 'network_weights',
-            'dit', 'vae', 'text_encoder',
+            'dit', 'vae', 'text_encoder', 't5', 'clip', 'task',
             'max_train_epochs', 'save_every_n_epochs', 'sample_every_n_epochs',
             'learning_rate', 'timestep_sampling', 'loraplus_lr_ratio',
-            'network_dim', 'network_alpha', 'blocks_to_swap'
+            'network_dim', 'network_alpha', 'blocks_to_swap',
+            'min_timestep', 'max_timestep', 'discrete_flow_shift', 'max_data_loader_n_workers'
         ];
         for (let key of ALL_KEYS) {
             let val = formData.get(`fixed_${key}`);
@@ -420,15 +540,18 @@ async function loadTasks() {
     }
 }
 
-async function fetchThumbnailUrl(outputName) {
+async function fetchThumbnailData(outputName) {
     try {
         const res = await fetch(`/api/config/${outputName}`);
-        if (!res.ok) return '';
+        if (!res.ok) return null;
         const data = await res.json();
-        const imgDir = data.template_params.datasets[0].image_directory;
-        if (imgDir) return `/api/thumbnail?path=${encodeURIComponent(imgDir)}`;
+        const imgDir = data.template_params.datasets[0].image_directory || data.template_params.datasets[0].video_directory;
+        if (imgDir) {
+            const metaRes = await fetch(`/api/thumbnail_meta?path=${encodeURIComponent(imgDir)}`);
+            if (metaRes.ok) return await metaRes.json();
+        }
     } catch (e) { }
-    return '';
+    return null;
 }
 
 async function renderTaskList() {
@@ -439,7 +562,17 @@ async function renderTaskList() {
     }
 
     const cardsHtml = await Promise.all(state.tasks.map(async task => {
-        const thumbUrl = await fetchThumbnailUrl(task.output_name);
+        const thumbData = await fetchThumbnailData(task.output_name);
+        
+        let mediaHtml = `<img src="https://placehold.co/200x200?text=No+Image" alt="">`;
+        if (thumbData && thumbData.url) {
+            if (thumbData.is_video) {
+                mediaHtml = `<video src="${thumbData.url}" loop muted playsinline preload="metadata" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px 8px 0 0;" onmouseover="this.play()" onmouseout="this.pause(); this.currentTime=0;"></video>`;
+            } else {
+                mediaHtml = `<img src="${thumbData.url}" alt="" onerror="this.src='https://placehold.co/200x200?text=No+Image';this.onerror=null;">`;
+            }
+        }
+
         return `
             <div class="task-card">
                 <div class="task-card-header">
@@ -447,7 +580,7 @@ async function renderTaskList() {
                 </div>
                 <div class="task-card-body">
                     <div class="thumbnail-wrapper">
-                        <img src="${thumbUrl}" alt="" onerror="this.src='https://placehold.co/200x200?text=No+Image';this.onerror=null;">
+                        ${mediaHtml}
                     </div>
                 </div>
                 <div class="task-card-footer">
@@ -518,6 +651,13 @@ async function cloneTask(name) {
         fixed.dataset_config = `./src/${newName}.toml`;
         fixed.sample_prompts = `./src/${newName}.toml`;
 
+        let cloneType = 'Qwen-Image';
+        if (template.datasets && template.datasets[0] && template.datasets[0].control_directory) {
+            cloneType = 'Qwen-Image-Edit-2511';
+        } else if (fixed.train_type === 'Wan2.2' || (fixed.model_version && fixed.model_version.toLowerCase().includes('wan')) || fixed.task) {
+            cloneType = 'Wan2.2';
+        }
+
         const saveRes = await fetch('/api/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -525,7 +665,7 @@ async function cloneTask(name) {
                 is_new: true,
                 fixed_params: fixed,
                 template_params: template,
-                train_type: template.datasets[0].control_directory ? 'Qwen-Image-Edit-2511' : 'Qwen-Image'
+                train_type: cloneType
             })
         });
 
@@ -612,8 +752,11 @@ function prepareNewTask() {
     const defaultType = Object.keys(state.templates)[0];
     const selectOptions = Object.keys(state.templates).map(t => ({ value: t, label: t }));
     renderCustomSelect('train-type-select-wrapper', 'train_type', selectOptions, defaultType);
+    
+    $('input_train_type').dataset.oldType = defaultType;
 
-    const fixedDefaults = JSON.parse(JSON.stringify(DEFAULTS));
+    const activeDefaults = defaultType === 'Wan2.2' ? DEFAULTS_WAN : DEFAULTS_QWEN;
+    const fixedDefaults = JSON.parse(JSON.stringify(activeDefaults));
     renderFormFields(defaultType, fixedDefaults);
 }
 
@@ -625,10 +768,17 @@ async function editTask(name) {
         state.isEditMode = true;
         state.oldName = name;
         $('config-title').innerText = `编辑: ${name}`;
-        const type = data.template_params.datasets[0].control_directory ? 'Qwen-Image-Edit-2511' : 'Qwen-Image';
+        let type = 'Qwen-Image';
+        if (data.template_params.datasets && data.template_params.datasets[0].control_directory) {
+            type = 'Qwen-Image-Edit-2511';
+        } else if (data.fixed_params.train_type === 'Wan2.2' || (data.fixed_params.model_version && data.fixed_params.model_version.toLowerCase().includes('wan')) || data.fixed_params.task) {
+            type = 'Wan2.2';
+        }
 
         const selectOptions = Object.keys(state.templates).map(t => ({ value: t, label: t }));
         renderCustomSelect('train-type-select-wrapper', 'train_type', selectOptions, type);
+        
+        $('input_train_type').dataset.oldType = type;
 
         renderFormFields(type, data.fixed_params, data.template_params);
         switchPage('config');
@@ -645,7 +795,7 @@ async function deleteTask(name) {
     } catch (err) { showToast('删除失败'); }
 }
 
-const FIXED_BLOCKS = [
+const FIXED_BLOCKS_QWEN = [
     { keys: ['output_name', 'output_dir', 'network_weights'], class: 'block-medium' },
     { keys: ['max_train_epochs', 'save_every_n_epochs', 'sample_every_n_epochs'], class: 'block-short' },
     { keys: ['learning_rate', 'timestep_sampling', 'loraplus_lr_ratio'], class: 'block-medium' },
@@ -653,25 +803,71 @@ const FIXED_BLOCKS = [
     { keys: ['dit', 'vae', 'text_encoder'], class: 'block-wide' }
 ];
 
+const FIXED_BLOCKS_WAN = [
+    { keys: ['task', 'ui_noise_level', 'output_name', 'output_dir'], class: 'block-medium' },
+    { keys: ['max_train_epochs', 'save_every_n_epochs', 'network_dim', 'network_alpha'], class: 'block-short' },
+    { keys: ['learning_rate', 'timestep_sampling', 'blocks_to_swap', 'loraplus_lr_ratio'], class: 'block-medium' },
+    { keys: ['min_timestep', 'max_timestep', 'discrete_flow_shift', 'max_data_loader_n_workers'], class: 'block-short' },
+    { keys: ['dit', 'vae', 't5', 'clip'], class: 'block-wide' }
+];
+
 function renderFormFields(type, fixedData = {}, templateData = null) {
     const baseTemplate = state.templates[type];
     let template = templateData ? mergeTemplateWithNewType(templateData, baseTemplate) : JSON.parse(JSON.stringify(baseTemplate));
     state.last_rendered_template = template;
 
+    const isWan = type === 'Wan2.2';
+    const activeBlocks = isWan ? FIXED_BLOCKS_WAN : FIXED_BLOCKS_QWEN;
+    const activeDefaults = isWan ? DEFAULTS_WAN : DEFAULTS_QWEN;
+
     const fixedContainer = $('fixed-params-grid');
-    fixedContainer.innerHTML = FIXED_BLOCKS.map(block => {
+    fixedContainer.innerHTML = activeBlocks.map(block => {
         return `<div class="params-block ${block.class}">${block.keys.map(key => {
-            let value = fixedData[key] !== undefined ? fixedData[key] : (DEFAULTS[key] !== undefined ? DEFAULTS[key] : '');
+            let value = (fixedData[key] !== undefined && fixedData[key] !== '') ? fixedData[key] : (activeDefaults[key] !== undefined ? activeDefaults[key] : '');
             if (key === 'timestep_sampling') {
                 const options = [
                     { value: 'qwen_shift', label: 'qwen_shift' },
                     { value: 'flux_shift', label: 'flux_shift' },
-                    { value: 'qinglong_qwen', label: 'qinglong_qwen' }
+                    { value: 'qinglong_qwen', label: 'qinglong_qwen' },
+                    { value: 'shift', label: 'shift' }
                 ];
                 setTimeout(() => {
                     renderCustomSelect(`dropdown_${key}`, `fixed_${key}`, options, value);
                 }, 0);
                 return `<div class="form-group dropdown-group"><label>${getLabel(key)}</label><div id="dropdown_${key}"></div></div>`;
+            }
+            if (key === 'task') {
+                const options = [
+                    { value: 'i2v-A14B', label: 'i2v-A14B' },
+                    { value: 't2v-A14B', label: 't2v-A14B' },
+                    { value: 'i2v-5B', label: 'i2v-5B' },
+                    { value: 't2v-5B', label: 't2v-5B' }
+                ];
+                setTimeout(() => {
+                    renderCustomSelect(`dropdown_${key}`, `fixed_${key}`, options, value || 't2v-A14B');
+                }, 0);
+                return `<div class="form-group dropdown-group"><label>${getLabel(key)}</label><div id="dropdown_${key}"></div></div>`;
+            }
+            if (key === 'ui_noise_level') {
+                return `<div class="form-group row-group">
+                            <label style="position:relative;top:5px;display:block;">高低噪选择</label>
+                            <div style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <label class="switch">
+                                        <input type="checkbox" id="switch_noise_low" checked onchange="toggleNoiseSwitch('low')">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span style="font-size: 0.85rem; color: #666;">低噪</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <label class="switch">
+                                        <input type="checkbox" id="switch_noise_high" onchange="toggleNoiseSwitch('high')">
+                                        <span class="slider"></span>
+                                    </label>
+                                    <span style="font-size: 0.85rem; color: #666;">高噪</span>
+                                </div>
+                            </div>
+                        </div>`;
             }
             if (typeof value === 'boolean') return renderToggleField(`fixed_${key}`, getLabel(key), value);
 
@@ -702,16 +898,22 @@ function renderFormFields(type, fixedData = {}, templateData = null) {
     renderDatasetRow(dsRow, flatGeneral, flatDataset, type);
 
     const sSection = $('page-config-samples');
-    sSection.innerHTML = `<div class="section-header"><h3><i class="fas fa-vial"></i> 采样测试</h3><button type="button" class="btn btn-primary btn-sm" id="btn-add-sample"><i class="fas fa-plus"></i> 添加采样</button></div><div id="samples-list"></div>`;
-
-    renderSamplesList(template.samples || []);
-    $('btn-add-sample').onclick = () => {
-        const current = getCurrentFormData();
-        state.last_rendered_template = current.template;
-        const defaultSample = JSON.parse(JSON.stringify(state.templates[type].samples[0]));
-        state.last_rendered_template.samples.push(defaultSample);
-        renderSamplesList(state.last_rendered_template.samples);
-    };
+    if (template.samples) {
+        sSection.style.display = 'block';
+        sSection.innerHTML = `<div class="section-header"><h3><i class="fas fa-vial"></i> 采样测试</h3><button type="button" class="btn btn-primary btn-sm" id="btn-add-sample"><i class="fas fa-plus"></i> 添加采样</button></div><div id="samples-list"></div>`;
+        renderSamplesList(template.samples);
+        $('btn-add-sample').onclick = () => {
+            const current = getCurrentFormData();
+            state.last_rendered_template = current.template;
+            const defaultSample = state.templates[type].samples ? JSON.parse(JSON.stringify(state.templates[type].samples[0])) : {};
+            if (!state.last_rendered_template.samples) state.last_rendered_template.samples = [];
+            state.last_rendered_template.samples.push(defaultSample);
+            renderSamplesList(state.last_rendered_template.samples);
+        };
+    } else {
+        sSection.style.display = 'none';
+        sSection.innerHTML = '';
+    }
 }
 
 window.updateOutputDir = (val) => {
@@ -745,7 +947,6 @@ function renderDatasetRow(container, general, dataset, type) {
         if (key.includes('resolution')) {
             let mainLabel = '分辨率';
             if (key === 'qwen_image_edit_control_resolution') mainLabel = '控制图分辨率';
-            else if (key === 'resolution') mainLabel = type === 'Qwen-Image-Edit-2511' ? '目标图分辨率' : '图片分辨率';
 
             return `
                 <div class="form-group input-mini-container">
@@ -763,6 +964,19 @@ function renderDatasetRow(container, general, dataset, type) {
         const isPath = key.includes('directory') || key.includes('path') || key === 'prompt';
 
         if (typeof val === 'boolean') return `<div class="form-group row-group"><label>${getLabel(key)}</label><label class="switch"><input type="checkbox" name="${fullKey}" ${val ? 'checked' : ''} value="true"><span class="slider"></span></label></div>`;
+
+        if (key === 'frame_extraction') {
+            const options = [
+                { value: 'head', label: 'head' },
+                { value: 'chunk', label: 'chunk' },
+                { value: 'uniform', label: 'uniform' },
+                { value: 'full', label: 'full' }
+            ];
+            setTimeout(() => {
+                renderCustomSelect(`dropdown_${fullKey}`, fullKey, options, val || 'uniform');
+            }, 0);
+            return `<div class="form-group dropdown-group"><label>${getLabel(key)}</label><div id="dropdown_${fullKey}"></div></div>`;
+        }
 
         // 检查是否需要路径选择器（目录字段）
         if (PATH_PICKER_CONFIG[key]) {
@@ -834,12 +1048,14 @@ function mergeTemplateWithNewType(oldTmpl, newTemplateBase) {
     if (oldTmpl.datasets && oldTmpl.datasets[0] && result.datasets && result.datasets[0]) {
         for (let k in result.datasets[0]) { if (oldTmpl.datasets[0][k] !== undefined) result.datasets[0][k] = oldTmpl.datasets[0][k]; }
     }
-    if (oldTmpl.samples && oldTmpl.samples.length > 0) {
+    if (oldTmpl.samples && oldTmpl.samples.length > 0 && result.samples !== undefined) {
         result.samples = oldTmpl.samples.map(oldS => {
-            const newS = JSON.parse(JSON.stringify(result.samples[0] || {}));
+            const newS = JSON.parse(JSON.stringify((result.samples && result.samples[0]) ? result.samples[0] : {}));
             for (let k in newS) { if (oldS[k] !== undefined) newS[k] = oldS[k]; }
             return newS;
         });
+    } else if (result.samples === undefined) {
+        delete result.samples;
     }
     return result;
 }
@@ -857,9 +1073,11 @@ async function saveConfig() {
     if (!name) { showToast('output_name (Lora名) 不能为空'); return; }
     const fixed = {};
     const type = $('input_train_type').value;
+    const isWan = type === 'Wan2.2';
+    const activeBlocks = isWan ? FIXED_BLOCKS_WAN : FIXED_BLOCKS_QWEN;
     const template = JSON.parse(JSON.stringify(state.last_rendered_template));
 
-    for (let block of FIXED_BLOCKS) {
+    for (let block of activeBlocks) {
         for (let key of block.keys) {
             let val = formData.get(`fixed_${key}`);
             if (val === null) {
@@ -874,23 +1092,39 @@ async function saveConfig() {
     if (template.datasets && template.datasets.length > 0) {
         updateObjectFromForm(template.datasets[0], 'tmpl_datasets_0', formData);
     }
-    template.samples = (template.samples || []).map((_, idx) => {
-        const sample = template.samples[idx];
-        updateObjectFromForm(sample, `tmpl_samples_${idx}`, formData);
-        return sample;
-    });
+    
+    if (isWan) {
+        delete template.samples;
+        fixed.i2v = !!(fixed.task && fixed.task.includes('i2v'));
+    } else {
+        template.samples = (template.samples || []).map((_, idx) => {
+            const sample = template.samples[idx];
+            updateObjectFromForm(sample, `tmpl_samples_${idx}`, formData);
+            return sample;
+        });
+    }
 
     // 1. 静默持久化核心：补全隐藏参数
-    // dataset_config 和 sample_prompts：新任务自动生成，老任务原样保留
     if (!fixed.dataset_config) {
         fixed.dataset_config = `./src/${name}.toml`;
     }
-    if (!fixed.sample_prompts) {
-        fixed.sample_prompts = `./src/${name}.toml`;
+    
+    // Qwen的专属参数
+    if (!isWan) {
+        if (!fixed.sample_prompts) fixed.sample_prompts = `./src/${name}.toml`;
+        fixed.model_version = type === 'Qwen-Image-Edit-2511' ? 'edit-2511' : 'original';
+    } else {
+        delete fixed.sample_prompts;
+        delete fixed.model_version;
+        
+        // Wan2.2 专有的静默推断及填充参数
+        fixed.log_tracker_name = fixed.output_name;
+        fixed.rank = fixed.network_dim;
+        fixed.weight_decay = 0.01;
+        fixed.update_proj_gap = 50;
+        fixed.scale = 1;
+        fixed.projection_type = 'std';
     }
-
-    // model_version：根据 train_type 自动路由
-    fixed.model_version = type === 'Qwen-Image-Edit-2511' ? 'edit-2511' : 'original';
 
     try {
         const res = await fetch('/api/save', {
@@ -926,6 +1160,13 @@ function updateObjectFromForm(obj, prefix, formData) {
             obj[key] = [p0, p1, p2].filter(p => p && p.trim() !== "");
             continue;
         }
+        if (key === 'target_frames') {
+            const val = formData.get(fullKey);
+            if (val) {
+                obj[key] = val.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            }
+            continue;
+        }
         let val = formData.get(fullKey);
         if (val === null) {
             const checkbox = document.querySelector(`input[name="${fullKey}"][type="checkbox"]`);
@@ -938,7 +1179,7 @@ function updateObjectFromForm(obj, prefix, formData) {
 function castType(key, val) {
     if (val === 'true') return true;
     if (val === 'false') return false;
-    if (['save_every_n_epochs', 'sample_every_n_epochs', 'max_train_epochs', 'batch_size', 'num_repeats', 'network_dim', 'network_alpha', 'blocks_to_swap', 'loraplus_lr_ratio', 'seed', 'discrete_flow_shift', 'sample_steps', 'width', 'height', 'guidance_scale', 'frame_count'].includes(key)) {
+    if (['save_every_n_epochs', 'sample_every_n_epochs', 'max_train_epochs', 'batch_size', 'num_repeats', 'network_dim', 'network_alpha', 'blocks_to_swap', 'loraplus_lr_ratio', 'seed', 'discrete_flow_shift', 'sample_steps', 'width', 'height', 'guidance_scale', 'frame_count', 'max_frames', 'frame_sample', 'min_timestep', 'max_timestep', 'max_data_loader_n_workers'].includes(key)) {
         const n = parseFloat(val);
         return isNaN(n) ? val : n;
     }

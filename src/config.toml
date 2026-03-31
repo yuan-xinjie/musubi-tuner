@@ -1,5 +1,4 @@
-# 全局设置
-[global_config]
+[qwen_config]
 logging_dir = "./logs"
 flash_attn = true
 sdpa = false
@@ -28,11 +27,42 @@ optimizer_type = "adamw"
 gradient_checkpointing = true
 gradient_checkpointing_cpu_offload = false
 
+[wan_config]
+logging_dir = "./logs"
+vae_cache_cpu = true
+force_v2_1_time_embedding = true
+preserve_distribution_shape = true
+flash_attn = true
+split_attn = true
+guidance_scale = 1
+gradient_checkpointing = true
+gradient_accumulation_steps = 1
+network_module = "networks.lora_wan"
+lr_scheduler = "cosine_with_min_lr"
+lr_scheduler_num_cycles = 1
+lr_decay_steps = 0.2
+lr_scheduler_min_lr_ratio = 0.1
+cuda_allow_tf32 = true
+cuda_cudnn_benchmark = true
+mixed_precision = "fp16"
+fp8_base = true
+fp8_scaled = true
+persistent_data_loader_workers = true
+use_pinned_memory_for_block_swap = true
+img_in_txt_in_offloading = true
+optimizer_type = "pytorch_optimizer.Fira"
+wandb_api_key = ""
+log_with = ""
+
 # 缓存设置
-[cache]
-vae_tiling = true
-vae_chunk_size = 32
+[qwen_cache]
+batch_size = 16
+vae_tiling = false
+vae_chunk_size = 0
 vae_spatial_tile_sample_min_size = 256
 fp8_vl = false
+
+[wan_cache]
+vae_cache_cp = true
 batch_size = 16
 

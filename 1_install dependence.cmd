@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 :: 定义核心变量
 set VENV_DIR=.venv
-set PYTHON_REQUIRED=3.12+
+set PYTHON_REQUIRED=3.11+
 
 echo ==============================================
 echo 检测虚拟环境
@@ -62,10 +62,10 @@ echo ==============================================
 echo UV创建虚拟环境
 echo ==============================================
 :: 用UV创建虚拟环境
-uv venv -p 3.12 --seed "%VENV_DIR%"
+uv venv -p 3.11 --seed "%VENV_DIR%"
 if errorlevel 1 (
     echo [错误] UV创建虚拟环境失败！
-    echo     可能原因：Python版本低于3.13 / UV安装异常
+    echo     可能原因：Python版本低于3.11 / UV安装异常
     pause
     exit /b
 )
@@ -83,24 +83,26 @@ if errorlevel 1 (
     exit /b
 )
 
-echo 正在安装当前项目(Editable模式)...
-pip install -e .
-
-echo 正在安装其他依赖...
-pip install ascii-magic matplotlib tensorboard prompt-toolkit
-pip install fastapi "uvicorn[standard]"
-pip install tomlkit
-pip install pydantic
-pip install typing
-pip install -U "triton-windows<3.6"
-
 echo 正在安装 PyTorch...
 pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cu130
 
-echo 安装flash_attn
-pip install "https://huggingface.co/Wildminder/AI-windows-whl/resolve/main/flash_attn-2.8.3+cu130torch2.9.1cxx11abiTRUE-cp312-cp312-win_amd64.whl"
+echo 正在安装依赖...
+pip install -e .
+pip install ascii-magic matplotlib tensorboard prompt-toolkit hf_xet
+pip install fastapi "uvicorn[standard]"
+pip install tomlkit
+pip install pydantic
+pip install pytorch_optimizer
+pip install typing
+pip install wandb
+pip install -U "triton-windows<3.6"
+
 echo 安装sageattention
-pip install "https://github.com/woct0rdho/SageAttention/releases/download/v2.2.0-windows.post4/sageattention-2.2.0+cu130torch2.9.0andhigher.post4-cp39-abi3-win_amd64.whl"
+pip install "https://huggingface.co/yuanxinjie/wheels/resolve/main/sageattention-2.2.0+cu130torch2.9.1-cp311-cp311-win_amd64.whl"
+
+echo 安装flash_attn
+pip install "https://huggingface.co/yuanxinjie/wheels/resolve/main/flash_attn-2.8.3+cu130torch2.9.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl"
+
 echo 依赖安装完成
 echo ==============================================
 echo [完成] 所有流程执行完毕！
