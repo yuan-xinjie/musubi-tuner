@@ -1,7 +1,11 @@
 """
 训练 & 缓存执行路由：命令组装与进程启动
 """
+import os
+import re
 import sys
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 
 from config_utils import CONFIG_PATH, read_toml, is_wan_task
@@ -261,6 +265,46 @@ def _build_train_cmd(config, task_item):
     return assembled
 
 
+def _check_wan_resume(task_item):
+    """
+    检查 Wan2.2 任务的输出文件夹，判断是否需要断点恢复或已完成。
+    返回:
+        ("resume", weights_path)  - 找到 checkpoint，需要续训
+        ("completed", None)       - 训练已完成
+        ("fresh", None)           - 全新训练
+    """
+    output_dir = task_item.get("output_dir", "")
+    output_name = task_item.get("output_name", "")
+    if not output_dir or not output_name:
+        return ("fresh", None)
+
+    output_path = Path(output_dir)
+    if not output_path.exists():
+        return ("fresh", None)
+
+    # 检查是否存在无编号的完成文件: $output_name.safetensors
+    final_file = output_path / f"{output_name}.safetensors"
+    if final_file.exists():
+        return ("completed", None)
+
+    # 检查带编号的 checkpoint 文件: $output_name-000002.safetensors 等
+    pattern = re.compile(rf"^{re.escape(output_name)}-(\d{{6}})\.safetensors$")
+    max_num = -1
+    max_file = None
+    for f in output_path.iterdir():
+        m = pattern.match(f.name)
+        if m:
+            num = int(m.group(1))
+            if num > max_num:
+                max_num = num
+                max_file = f
+
+    if max_file is not None:
+        return ("resume", str(max_file.resolve()).replace("\\", "/"))
+
+    return ("fresh", None)
+
+
 @router.post("/api/train/{name}")
 async def run_train(name: str):
     config = read_toml(CONFIG_PATH)
@@ -270,7 +314,26 @@ async def run_train(name: str):
     if not task_item:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # Wan2.2 任务：检查输出文件夹，判断是否续训或已完成
+    resume_weights = None
+    if is_wan_task(task_item):
+        status, weights_path = _check_wan_resume(task_item)
+        if status == "completed":
+            return {
+                "status": "completed",
+                "message": "该训练任务已完成"
+            }
+        elif status == "resume":
+            resume_weights = weights_path
+
     assembled_args = _build_train_cmd(config, task_item)
+
+    # 如果有 checkpoint，追加 --network_weights 和 --dim_from_weights
+    if resume_weights:
+        assembled_args.append(f"--network_weights={resume_weights}")
+        # assembled_args.append("--dim_from_weights")
+        print(f"[DEBUG] 断点恢复，加载权重: {resume_weights}")
+
     print(f"[DEBUG] Train Command: {assembled_args}")
 
     try:

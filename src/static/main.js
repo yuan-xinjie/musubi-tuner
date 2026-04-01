@@ -630,6 +630,12 @@ async function trainTask(name) {
             const err = await res.json();
             showToast(`启动失败: ${err.detail}`);
             $('log-content').innerHTML += `\n[ERROR] ${err.detail}\n`;
+        } else {
+            const data = await res.json();
+            if (data.status === 'completed') {
+                showToast(data.message || '该训练任务已完成');
+                $('log-content').innerHTML += `\n[INFO] ${data.message || '该训练任务已完成'}\n`;
+            }
         }
     } catch (e) {
         showToast('启动命令失败');
