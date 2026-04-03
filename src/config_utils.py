@@ -19,7 +19,6 @@ STATIC_DIR = SCRIPT_DIR / "static"
 TEMPLATES = {
     "Qwen-Image": {
         "general": {
-            "resolution": [1024, 1024],
             "caption_extension": ".txt",
             "batch_size": 1,
             "num_repeats": 1,
@@ -27,6 +26,7 @@ TEMPLATES = {
             "bucket_no_upscale": False,
         },
         "datasets": [{
+            "resolution": [1024, 1024],
             "image_directory": "./dataset/image",
             "cache_directory": "./dataset/image/cache",
         }],
@@ -43,7 +43,6 @@ TEMPLATES = {
     },
     "Qwen-Image-Edit-2511": {
         "general": {
-            "resolution": [1024, 1024],
             "caption_extension": ".txt",
             "batch_size": 1,
             "num_repeats": 1,
@@ -51,6 +50,7 @@ TEMPLATES = {
             "bucket_no_upscale": False,
         },
         "datasets": [{
+            "resolution": [1024, 1024],
             "image_directory": "./dataset/target",
             "cache_directory": "./dataset/target/cache",
             "control_directory": "./dataset/control",
@@ -69,7 +69,6 @@ TEMPLATES = {
     },
     "Wan2.2": {
         "general": {
-            "resolution": [512, 512],
             "caption_extension": ".txt",
             "batch_size": 1,
             "enable_bucket": True,
@@ -77,6 +76,7 @@ TEMPLATES = {
             "num_repeats": 10,
         },
         "datasets": [{
+            "resolution": [512, 512],
             "video_directory": "./dataset/video",
             "cache_directory": "./dataset/video/cache",
             "target_frames": [1, 13, 25],

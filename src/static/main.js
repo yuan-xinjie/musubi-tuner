@@ -17,7 +17,7 @@ const DEFAULTS_QWEN = {
     'save_every_n_epochs': 2,
     'sample_every_n_epochs': 2,
     'timestep_sampling': 'qwen_shift',
-    'loraplus_lr_ratio': 3,
+    'loraplus_lr_ratio': 4,
     'network_dim': 32,
     'network_alpha': 16,
     'blocks_to_swap': 20,
@@ -140,8 +140,18 @@ window.pickPath = async function (inputId, config) {
     }
 }
 
-window.updateCacheDir = (val) => {
-    const cacheInput = document.getElementById('input_tmpl_datasets_0_cache_directory') || document.querySelector(`input[name="tmpl_datasets_0_cache_directory"]`);
+window.updateCacheDir = (val, sourceName) => {
+    let cacheInput = null;
+    if (sourceName) {
+        const match = sourceName.match(/tmpl_datasets_(\d+)_/);
+        if (match) {
+            const idx = match[1];
+            cacheInput = document.getElementById(`input_tmpl_datasets_${idx}_cache_directory`) || document.querySelector(`input[name="tmpl_datasets_${idx}_cache_directory"]`);
+        }
+    } else {
+        cacheInput = document.getElementById('input_tmpl_datasets_0_cache_directory') || document.querySelector(`input[name="tmpl_datasets_0_cache_directory"]`);
+    }
+
     if (cacheInput && val) {
         const sep = val.includes('\\') ? '\\' : '/';
         const stripped = val.endsWith(sep) ? val.slice(0, -1) : val;
@@ -154,8 +164,8 @@ function renderPathInput(name, label, value, pickerKey) {
     const config = PATH_PICKER_CONFIG[pickerKey];
     const configJson = JSON.stringify(config).replace(/"/g, '&quot;');
     let extraAttr = '';
-    if (name === 'tmpl_datasets_0_video_directory' || name === 'tmpl_datasets_0_image_directory') {
-        extraAttr = `oninput="updateCacheDir(this.value)" onchange="updateCacheDir(this.value)"`;
+    if (name.includes('video_directory') || name.includes('image_directory')) {
+        extraAttr = `oninput="updateCacheDir(this.value, '${name}')" onchange="updateCacheDir(this.value, '${name}')"`;
     }
     return `
         <div class="form-group flex-grow">
@@ -470,7 +480,7 @@ window.selectDropdownOption = (name, value, label) => {
                 currentData.fixed[k] = activeDefaults[k];
             }
         }
-        
+
         const oldType = $('input_train_type').dataset.oldType;
         if (oldType && oldType !== value) {
             currentData.template = JSON.parse(JSON.stringify(state.templates[value] || state.templates['Qwen-Image']));
@@ -519,7 +529,10 @@ function getCurrentFormData() {
         }
         updateObjectFromForm(rawTemplate.general, 'tmpl_general', formData);
         if (rawTemplate.datasets && rawTemplate.datasets.length > 0) {
-            updateObjectFromForm(rawTemplate.datasets[0], 'tmpl_datasets_0', formData);
+            rawTemplate.datasets = rawTemplate.datasets.map((ds, idx) => {
+                updateObjectFromForm(ds, `tmpl_datasets_${idx}`, formData);
+                return ds;
+            });
         }
         rawTemplate.samples = (rawTemplate.samples || []).map((_, idx) => {
             const sample = rawTemplate.samples[idx];
@@ -563,7 +576,7 @@ async function renderTaskList() {
 
     const cardsHtml = await Promise.all(state.tasks.map(async task => {
         const thumbData = await fetchThumbnailData(task.output_name);
-        
+
         let mediaHtml = `<img src="https://placehold.co/200x200?text=No+Image" alt="">`;
         if (thumbData && thumbData.url) {
             if (thumbData.is_video) {
@@ -758,7 +771,7 @@ function prepareNewTask() {
     const defaultType = Object.keys(state.templates)[0];
     const selectOptions = Object.keys(state.templates).map(t => ({ value: t, label: t }));
     renderCustomSelect('train-type-select-wrapper', 'train_type', selectOptions, defaultType);
-    
+
     $('input_train_type').dataset.oldType = defaultType;
 
     const activeDefaults = defaultType === 'Wan2.2' ? DEFAULTS_WAN : DEFAULTS_QWEN;
@@ -783,7 +796,7 @@ async function editTask(name) {
 
         const selectOptions = Object.keys(state.templates).map(t => ({ value: t, label: t }));
         renderCustomSelect('train-type-select-wrapper', 'train_type', selectOptions, type);
-        
+
         $('input_train_type').dataset.oldType = type;
 
         renderFormFields(type, data.fixed_params, data.template_params);
@@ -895,13 +908,72 @@ function renderFormFields(type, fixedData = {}, templateData = null) {
     const datasets = template.datasets || [];
     const rowSection = document.createElement('div');
     rowSection.className = 'form-section';
-    rowSection.innerHTML = `<div class="section-header"><h3><i class="fas fa-layer-group"></i> ${getLabel('dataset_config')}</h3></div><div class="params-grid" id="dataset-row-params"></div>`;
+    rowSection.innerHTML = `
+        <div class="section-header">
+            <h3><i class="fas fa-layer-group"></i> ${getLabel('dataset_config')}</h3>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-add-dataset"><i class="fas fa-plus"></i> 添加数据集</button>
+        </div>
+        <div id="datasets-list"></div>
+    `;
     gdGroup.appendChild(rowSection);
 
-    const dsRow = $('dataset-row-params');
-    const flatGeneral = filterHidden(template.general);
-    const flatDataset = datasets.length > 0 ? filterHidden(datasets[0]) : {};
-    renderDatasetRow(dsRow, flatGeneral, flatDataset, type);
+    const dsList = $('datasets-list');
+
+    window.renderDatasetList = function (templateData) {
+        dsList.innerHTML = '';
+        const dss = templateData.datasets || [];
+        dss.forEach((dataset, idx) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'dataset-card';
+            wrapper.style.marginBottom = '15px';
+            wrapper.style.padding = '15px';
+            wrapper.style.backgroundColor = 'var(--bg-secondary)';
+            wrapper.style.borderRadius = 'var(--radius-md)';
+            wrapper.style.border = '1px solid var(--border-color)';
+
+            if (idx > 0) {
+                wrapper.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h4 style="margin: 0; font-size: 0.95rem; color: var(--text-primary);">数据集 #${idx + 1}</h4>
+                        <button type="button" class="btn btn-danger-ghost btn-xs" onclick="removeDataset(${idx})"><i class="fas fa-trash"></i> 删除</button>
+                    </div>
+                    <div class="params-grid" id="dataset-row-params-${idx}"></div>
+                `;
+            } else {
+                wrapper.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h4 style="margin: 0; font-size: 0.95rem; color: var(--text-primary);">全局数据集及数据集 #1</h4>
+                    </div>
+                    <div class="params-grid" id="dataset-row-params-0"></div>
+                `;
+            }
+            dsList.appendChild(wrapper);
+
+            const dsRow = $(`dataset-row-params-${idx}`);
+            const flatDataset = filterHidden(dataset);
+            const flatGeneral = (idx === 0 && templateData.general) ? filterHidden(templateData.general) : {};
+
+            renderDatasetRow(dsRow, flatGeneral, flatDataset, type, idx);
+        });
+    };
+
+    window.renderDatasetList(template);
+
+    $('btn-add-dataset').onclick = () => {
+        const current = getCurrentFormData();
+        state.last_rendered_template = current.template;
+
+        let defaultDataset = {};
+        if (state.last_rendered_template.datasets && state.last_rendered_template.datasets.length > 0) {
+            defaultDataset = JSON.parse(JSON.stringify(state.last_rendered_template.datasets[0]));
+        } else {
+            defaultDataset = state.templates[type].datasets ? JSON.parse(JSON.stringify(state.templates[type].datasets[0])) : {};
+        }
+
+        if (!state.last_rendered_template.datasets) state.last_rendered_template.datasets = [];
+        state.last_rendered_template.datasets.push(defaultDataset);
+        window.renderDatasetList(state.last_rendered_template);
+    };
 
     const sSection = $('page-config-samples');
     if (template.samples) {
@@ -927,7 +999,7 @@ window.updateOutputDir = (val) => {
     if (dirInput) dirInput.value = `./output/${val}`;
 };
 
-function renderDatasetRow(container, general, dataset, type) {
+function renderDatasetRow(container, general, dataset, type, idx = 0) {
     const all = { ...general, ...dataset };
     let keys = Object.keys(all).filter(k => !HIDDEN_KEYS.includes(k));
 
@@ -947,7 +1019,7 @@ function renderDatasetRow(container, general, dataset, type) {
 
     container.innerHTML = keys.map(key => {
         const val = all[key];
-        const prefix = general[key] !== undefined ? 'tmpl_general' : 'tmpl_datasets_0';
+        const prefix = general !== undefined && general[key] !== undefined ? 'tmpl_general' : `tmpl_datasets_${idx}`;
         const fullKey = `${prefix}_${key}`;
 
         if (key.includes('resolution')) {
@@ -1050,9 +1122,28 @@ function filterHidden(obj) {
 
 function mergeTemplateWithNewType(oldTmpl, newTemplateBase) {
     const result = JSON.parse(JSON.stringify(newTemplateBase));
+
+    // 向后兼容：如果旧配置的 general 有 resolution，转移到其 datasets 中
+    if (oldTmpl.general && oldTmpl.general.resolution !== undefined) {
+        if (oldTmpl.datasets && oldTmpl.datasets.length > 0) {
+            oldTmpl.datasets.forEach(ds => {
+                if (ds.resolution === undefined) {
+                    ds.resolution = [...oldTmpl.general.resolution];
+                }
+            });
+        }
+        delete oldTmpl.general.resolution;
+    }
+
     if (oldTmpl.general) for (let k in result.general) { if (oldTmpl.general[k] !== undefined) result.general[k] = oldTmpl.general[k]; }
-    if (oldTmpl.datasets && oldTmpl.datasets[0] && result.datasets && result.datasets[0]) {
-        for (let k in result.datasets[0]) { if (oldTmpl.datasets[0][k] !== undefined) result.datasets[0][k] = oldTmpl.datasets[0][k]; }
+    if (oldTmpl.datasets && oldTmpl.datasets.length > 0 && result.datasets !== undefined) {
+        result.datasets = oldTmpl.datasets.map(oldDs => {
+            const newDs = JSON.parse(JSON.stringify((result.datasets && result.datasets[0]) ? result.datasets[0] : {}));
+            for (let k in newDs) { if (oldDs[k] !== undefined) newDs[k] = oldDs[k]; }
+            return newDs;
+        });
+    } else if (result.datasets === undefined) {
+        delete result.datasets;
     }
     if (oldTmpl.samples && oldTmpl.samples.length > 0 && result.samples !== undefined) {
         result.samples = oldTmpl.samples.map(oldS => {
@@ -1071,6 +1162,13 @@ window.removeSample = (idx) => {
     state.last_rendered_template = current.template;
     state.last_rendered_template.samples.splice(idx, 1);
     renderSamplesList(state.last_rendered_template.samples);
+};
+
+window.removeDataset = (idx) => {
+    const current = getCurrentFormData();
+    state.last_rendered_template = current.template;
+    state.last_rendered_template.datasets.splice(idx, 1);
+    window.renderDatasetList(state.last_rendered_template);
 };
 
 async function saveConfig() {
@@ -1096,9 +1194,11 @@ async function saveConfig() {
 
     updateObjectFromForm(template.general, 'tmpl_general', formData);
     if (template.datasets && template.datasets.length > 0) {
-        updateObjectFromForm(template.datasets[0], 'tmpl_datasets_0', formData);
+        template.datasets.forEach((ds, idx) => {
+            updateObjectFromForm(ds, `tmpl_datasets_${idx}`, formData);
+        });
     }
-    
+
     if (isWan) {
         delete template.samples;
         fixed.i2v = !!(fixed.task && fixed.task.includes('i2v'));
@@ -1114,7 +1214,7 @@ async function saveConfig() {
     if (!fixed.dataset_config) {
         fixed.dataset_config = `./src/${name}.toml`;
     }
-    
+
     // Qwen的专属参数
     if (!isWan) {
         if (!fixed.sample_prompts) fixed.sample_prompts = `./src/${name}.toml`;
@@ -1122,7 +1222,7 @@ async function saveConfig() {
     } else {
         delete fixed.sample_prompts;
         delete fixed.model_version;
-        
+
         // Wan2.2 专有的静默推断及填充参数
         fixed.log_tracker_name = fixed.output_name;
         fixed.rank = fixed.network_dim;
