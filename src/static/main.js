@@ -20,8 +20,7 @@ const DEFAULTS_QWEN = {
     'loraplus_lr_ratio': 4,
     'network_dim': 32,
     'network_alpha': 16,
-    'blocks_to_swap': 20,
-    'network_weights': ''
+    'blocks_to_swap': 20
 };
 
 const DEFAULTS_WAN = {
@@ -33,7 +32,6 @@ const DEFAULTS_WAN = {
     'network_dim': 32,
     'network_alpha': 16,
     'blocks_to_swap': 16,
-    'network_weights': '',
     'max_data_loader_n_workers': 8,
     'task': 't2v-A14B'
 };
@@ -57,7 +55,6 @@ const LABEL_MAP = {
     'dit': '底模路径',
     'vae': 'VAE路径',
     'text_encoder': '文本编码器路径',
-    'network_weights': '从已有的权重继续训练',
     'resolution': '分辨率',
     'dataset_config': '数据集配置',
     'batch_size': '批次大小',
@@ -512,7 +509,7 @@ function getCurrentFormData() {
 
     if (rawTemplate) {
         const ALL_KEYS = [
-            'output_name', 'output_dir', 'network_weights',
+            'output_name', 'output_dir',
             'dit', 'vae', 'text_encoder', 't5', 'clip', 'task',
             'max_train_epochs', 'save_every_n_epochs', 'sample_every_n_epochs',
             'learning_rate', 'timestep_sampling', 'loraplus_lr_ratio',
@@ -815,7 +812,7 @@ async function deleteTask(name) {
 }
 
 const FIXED_BLOCKS_QWEN = [
-    { keys: ['output_name', 'output_dir', 'network_weights'], class: 'block-medium' },
+    { keys: ['output_name', 'output_dir'], class: 'block-medium' },
     { keys: ['max_train_epochs', 'save_every_n_epochs', 'sample_every_n_epochs'], class: 'block-short' },
     { keys: ['learning_rate', 'timestep_sampling', 'loraplus_lr_ratio'], class: 'block-medium' },
     { keys: ['network_dim', 'network_alpha', 'blocks_to_swap'], class: 'block-short' },

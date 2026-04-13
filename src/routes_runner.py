@@ -265,14 +265,16 @@ def _build_train_cmd(config, task_item):
     return assembled
 
 
-def _check_wan_resume(task_item):
+def _check_and_backup_resume(task_item):
     """
-    检查 Wan2.2 任务的输出文件夹，判断是否需要断点恢复或已完成。
+    检查任务的输出文件夹，判断是否需要断点恢复或已完成。
+    如果需要断点恢复，会将所有的 checkpoint 文件移动到 backup 文件夹中。
     返回:
         ("resume", weights_path)  - 找到 checkpoint，需要续训
         ("completed", None)       - 训练已完成
         ("fresh", None)           - 全新训练
     """
+    import shutil
     output_dir = task_item.get("output_dir", "")
     output_name = task_item.get("output_name", "")
     if not output_dir or not output_name:
@@ -291,16 +293,33 @@ def _check_wan_resume(task_item):
     pattern = re.compile(rf"^{re.escape(output_name)}-(\d{{6}})\.safetensors$")
     max_num = -1
     max_file = None
+    all_checkpoints = []
+    
     for f in output_path.iterdir():
-        m = pattern.match(f.name)
-        if m:
-            num = int(m.group(1))
-            if num > max_num:
-                max_num = num
-                max_file = f
+        if f.is_file():
+            m = pattern.match(f.name)
+            if m:
+                num = int(m.group(1))
+                all_checkpoints.append(f)
+                if num > max_num:
+                    max_num = num
+                    max_file = f
 
     if max_file is not None:
-        return ("resume", str(max_file.resolve()).replace("\\", "/"))
+        # 将所有的 checkpoint 移动到 backup 文件夹
+        backup_dir = output_path / f"{output_name}-backup"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        new_max_file_path = None
+        for cp in all_checkpoints:
+            dest = backup_dir / cp.name
+            # shutil.move can overwrite if the file exists, but generally it's safer
+            shutil.move(str(cp), str(dest))
+            # 记录最新权重在 backup 中的新路径
+            if cp.name == max_file.name:
+                new_max_file_path = dest
+        
+        if new_max_file_path:
+            return ("resume", str(new_max_file_path.resolve()).replace("\\", "/"))
 
     return ("fresh", None)
 
@@ -314,17 +333,16 @@ async def run_train(name: str):
     if not task_item:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # Wan2.2 任务：检查输出文件夹，判断是否续训或已完成
+    # 检查输出文件夹，判断是否续训或已完成
     resume_weights = None
-    if is_wan_task(task_item):
-        status, weights_path = _check_wan_resume(task_item)
-        if status == "completed":
-            return {
-                "status": "completed",
-                "message": "该训练任务已完成"
-            }
-        elif status == "resume":
-            resume_weights = weights_path
+    status, weights_path = _check_and_backup_resume(task_item)
+    if status == "completed":
+        return {
+            "status": "completed",
+            "message": "该训练任务已完成"
+        }
+    elif status == "resume":
+        resume_weights = weights_path
 
     assembled_args = _build_train_cmd(config, task_item)
 
