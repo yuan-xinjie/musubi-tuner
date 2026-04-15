@@ -64,22 +64,43 @@ class ProcessManager:
 
                 def _read_io():
                     try:
+                        residual = b""
                         while True:
                             if not self.process or not self.process.stdout:
                                 break
-                            chunk = self.process.stdout.read(1024)
+                            
+                            chunk = self.process.stdout.read(4096)
                             if not chunk:
+                                if residual:
+                                    self.sync_queue.put({"type": "log", "content": residual.decode('utf-8', errors='replace')})
                                 break
 
-                            try:
-                                text = chunk.decode('utf-8')
-                            except UnicodeDecodeError:
-                                try:
-                                    text = chunk.decode('gbk')
-                                except UnicodeDecodeError:
-                                    text = chunk.decode('utf-8', errors='replace')
+                            data = residual + chunk
+                            text = ""
 
-                            self.sync_queue.put({"type": "log", "content": text})
+                            try:
+                                text = data.decode('utf-8')
+                                residual = b""
+                            except UnicodeDecodeError as e:
+                                # 若解码错点在最后几个字节，说明遇到了因分块读取而被腰斩的多字节字符
+                                if e.start >= len(data) - 4:
+                                    text = data[:e.start].decode('utf-8')
+                                    residual = data[e.start:]
+                                else:
+                                    # 错误并不是在末尾，说明这股输出流根本就不是纯正的 UTF-8 (可能是底层的 GBK 输出)
+                                    try:
+                                        text = data.decode('gbk')
+                                        residual = b""
+                                    except UnicodeDecodeError as ge:
+                                        if ge.start >= len(data) - 2:
+                                            text = data[:ge.start].decode('gbk')
+                                            residual = data[ge.start:]
+                                        else:
+                                            text = data.decode('utf-8', errors='replace')
+                                            residual = b""
+
+                            if text:
+                                self.sync_queue.put({"type": "log", "content": text})
                     except Exception as e:
                         self.sync_queue.put({"type": "log", "content": f"\n[READ ERROR] {str(e)}\n"})
 
